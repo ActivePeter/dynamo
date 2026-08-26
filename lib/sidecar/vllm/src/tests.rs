@@ -899,6 +899,10 @@ async fn aggregated_generation_converts_request_stream_and_usage() {
     assert_eq!(config.model, "model-source");
     assert_eq!(config.served_model_name.as_deref(), Some("served-model"));
     assert_eq!(config.model_aliases, ["model-alias"]);
+    assert_eq!(
+        config.runtime_data.get("vllm_inference_v1_generate"),
+        Some(&json!(true))
+    );
     let registration = config.llm.expect("LLM registration");
     assert_eq!(registration.context_length, Some(8192));
     assert_eq!(registration.kv_cache_block_size, Some(16));
