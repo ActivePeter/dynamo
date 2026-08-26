@@ -612,14 +612,12 @@ fn oversized_logprob_counts_are_rejected() {
 }
 
 #[test]
-fn terminal_routed_experts_are_mapped_to_native_numpy_engine_data() {
+fn terminal_native_routed_experts_are_forwarded_as_opaque_engine_data() {
     let request = request();
     let mut state = ResponseState::new(&request, DisaggregationMode::Aggregated);
     let mut response = sequence_response(true, true, None);
-    response.outputs.as_mut().unwrap().routed_experts = Some(pb::RoutedExperts {
-        data: vec![1, 2, 3, 4],
-        shape: vec![2, 1, 2],
-        dtype: "uint8".to_string(),
+    response.outputs.as_mut().unwrap().routed_experts = Some(pb::OpaquePayload {
+        data: b"\x93NUMPY\x01\x00native".to_vec(),
     });
 
     let output = state
@@ -631,26 +629,22 @@ fn terminal_routed_experts_are_mapped_to_native_numpy_engine_data() {
             .engine_data
             .as_ref()
             .and_then(|data| data.get("routed_experts")),
-        Some(&json!(
-            "k05VTVBZAQB2AHsnZGVzY3InOiAnfHUxJywgJ2ZvcnRyYW5fb3JkZXInOiBGYWxzZSwgJ3NoYXBlJzogKDIsIDEsIDIpLCB9ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAoBAgME"
-        ))
+        Some(&json!("k05VTVBZAQBuYXRpdmU="))
     );
 }
 
 #[test]
-fn terminal_uint16_routed_experts_preserve_numpy_dtype() {
+fn terminal_prime_routed_experts_are_forwarded_as_opaque_engine_data() {
     let request = request();
     let mut state = ResponseState::new(&request, DisaggregationMode::Aggregated);
     let mut response = sequence_response(true, true, None);
-    response.outputs.as_mut().unwrap().routed_experts = Some(pb::RoutedExperts {
-        data: vec![1, 0, 2, 0, 3, 0, 4, 0],
-        shape: vec![2, 1, 2],
-        dtype: "uint16".to_string(),
+    response.outputs.as_mut().unwrap().routed_experts = Some(pb::OpaquePayload {
+        data: br#"{"data":"AQID","shape":[1,1,3],"start":0}"#.to_vec(),
     });
 
     let output = state
         .convert(response)
-        .expect("valid uint16 routed experts")
+        .expect("opaque Prime routed experts")
         .expect("terminal output");
     assert_eq!(
         output
@@ -658,26 +652,9 @@ fn terminal_uint16_routed_experts_preserve_numpy_dtype() {
             .as_ref()
             .and_then(|data| data.get("routed_experts")),
         Some(&json!(
-            "k05VTVBZAQB2AHsnZGVzY3InOiAnPHUyJywgJ2ZvcnRyYW5fb3JkZXInOiBGYWxzZSwgJ3NoYXBlJzogKDIsIDEsIDIpLCB9ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAoBAAIAAwAEAA=="
+            "eyJkYXRhIjoiQVFJRCIsInNoYXBlIjpbMSwxLDNdLCJzdGFydCI6MH0="
         ))
     );
-}
-
-#[test]
-fn malformed_terminal_routed_experts_are_rejected() {
-    let request = request();
-    let mut state = ResponseState::new(&request, DisaggregationMode::Aggregated);
-    let mut response = sequence_response(true, true, None);
-    response.outputs.as_mut().unwrap().routed_experts = Some(pb::RoutedExperts {
-        data: vec![1],
-        shape: vec![2, 1, 2],
-        dtype: "uint8".to_string(),
-    });
-
-    let error = state
-        .convert(response)
-        .expect_err("byte-length mismatch must fail");
-    assert!(error.to_string().contains("byte length mismatch"));
 }
 
 #[test]
@@ -685,10 +662,8 @@ fn nonterminal_routed_experts_are_rejected() {
     let request = request();
     let mut state = ResponseState::new(&request, DisaggregationMode::Aggregated);
     let mut response = sequence_response(false, true, None);
-    response.outputs.as_mut().unwrap().routed_experts = Some(pb::RoutedExperts {
+    response.outputs.as_mut().unwrap().routed_experts = Some(pb::OpaquePayload {
         data: vec![1],
-        shape: vec![1, 1, 1],
-        dtype: "uint8".to_string(),
     });
 
     let error = state
