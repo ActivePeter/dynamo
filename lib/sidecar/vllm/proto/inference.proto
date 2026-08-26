@@ -157,13 +157,11 @@ message SequenceOutput {
   // Only present in final output for this sequence
   optional FinishInfo finish_info = 8;
   // Only present in final output when routed-experts capture is enabled.
-  optional RoutedExperts routed_experts = 9;
+  optional OpaquePayload routed_experts = 9;
 }
 
-message RoutedExperts {
+message OpaquePayload {
   bytes data = 1;
-  repeated uint32 shape = 2;
-  string dtype = 3;
 }
 
 // Prompt info, returned in the first response

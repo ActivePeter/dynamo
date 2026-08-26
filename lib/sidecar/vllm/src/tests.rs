@@ -662,9 +662,7 @@ fn nonterminal_routed_experts_are_rejected() {
     let request = request();
     let mut state = ResponseState::new(&request, DisaggregationMode::Aggregated);
     let mut response = sequence_response(false, true, None);
-    response.outputs.as_mut().unwrap().routed_experts = Some(pb::OpaquePayload {
-        data: vec![1],
-    });
+    response.outputs.as_mut().unwrap().routed_experts = Some(pb::OpaquePayload { data: vec![1] });
 
     let error = state
         .convert(response)
