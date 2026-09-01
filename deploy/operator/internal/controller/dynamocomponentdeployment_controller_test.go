@@ -241,7 +241,7 @@ func TestDCDWorkloadRendererAutomaticFailoverCheckpointRefs(t *testing.T) {
 			},
 		},
 		Spec: v1alpha1.DynamoCheckpointSpec{
-			Identity: &v1alpha1.DynamoCheckpointIdentity{
+			Identity: v1alpha1.DynamoCheckpointIdentity{
 				Model:            "model",
 				BackendFramework: string(dynamo.BackendFrameworkVLLM),
 			},
@@ -260,29 +260,10 @@ func TestDCDWorkloadRendererAutomaticFailoverCheckpointRefs(t *testing.T) {
 		wantNames   []string
 	}{
 		{
-			name: "manual checkpoint",
-			mutate: func(ckpt *v1alpha1.DynamoCheckpoint) {
-				delete(ckpt.Annotations, commonconsts.CheckpointAutoAnnotation)
-			},
-		},
-		{
-			name: "foreign automatic checkpoint",
-			mutate: func(ckpt *v1alpha1.DynamoCheckpoint) {
-				ckpt.OwnerReferences[0].Name = "other-graph"
-				ckpt.OwnerReferences[0].UID = "other-graph-uid"
-			},
-		},
-		{
 			name:        "one shadow",
 			numShadows:  1,
 			wantTargets: "engine-0,engine-1",
 			wantNames:   []string{"engine-0", "engine-1", "observer"},
-		},
-		{
-			name:        "two shadows",
-			numShadows:  2,
-			wantTargets: "engine-0,engine-1,engine-2",
-			wantNames:   []string{"engine-0", "engine-1", "engine-2", "observer"},
 		},
 	}
 	for _, tt := range tests {
@@ -2032,7 +2013,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseReady,
 			},
@@ -2090,7 +2071,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Namespace: "default",
 			},
 			Spec: v1alpha1.DynamoCheckpointSpec{
-				Identity:         &identity,
+				Identity:         identity,
 				GPUMemoryService: &v1alpha1.GPUMemoryServiceSpec{Enabled: true},
 			},
 			Status: v1alpha1.DynamoCheckpointStatus{
@@ -2172,7 +2153,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Namespace: "default",
 			},
 			Spec: v1alpha1.DynamoCheckpointSpec{
-				Identity: &identity,
+				Identity: identity,
 			},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseReady,
@@ -2213,7 +2194,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Namespace: "default",
 			},
 			Spec: v1alpha1.DynamoCheckpointSpec{
-				Identity:         &identity,
+				Identity:         identity,
 				GPUMemoryService: &v1alpha1.GPUMemoryServiceSpec{Enabled: true},
 			},
 			Status: v1alpha1.DynamoCheckpointStatus{
@@ -2262,7 +2243,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseReady,
 			},
@@ -2324,7 +2305,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseReady,
 			},
@@ -2368,7 +2349,7 @@ func TestDynamoComponentDeploymentReconciler_generatePodTemplateSpec_RestoreLabe
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseCreating,
 			},
@@ -2501,7 +2482,7 @@ func TestDynamoComponentDeploymentReconciler_generateDeployment_RestoreStrategy(
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseReady,
 			},
@@ -2534,7 +2515,7 @@ func TestDynamoComponentDeploymentReconciler_generateDeployment_RestoreStrategy(
 				Name:      checkpointName,
 				Namespace: "default",
 			},
-			Spec: v1alpha1.DynamoCheckpointSpec{Identity: &identity},
+			Spec: v1alpha1.DynamoCheckpointSpec{Identity: identity},
 			Status: v1alpha1.DynamoCheckpointStatus{
 				Phase: v1alpha1.DynamoCheckpointPhaseCreating,
 			},

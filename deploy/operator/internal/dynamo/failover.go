@@ -503,9 +503,6 @@ func validateAutomaticFailoverCheckpointProfile(
 	if !IsIntraPodFailoverEnabled(component) {
 		violations = append(violations, errors.New("failover.mode must be IntraPod"))
 	}
-	if experimental.Failover.NumShadows < 0 || experimental.Failover.NumShadows > 2 {
-		violations = append(violations, errors.New("failover.numShadows must be 1 or 2"))
-	}
 	if component.GetNumberOfNodes() != 1 {
 		violations = append(violations, errors.New("worker must use exactly one node"))
 	}
@@ -719,16 +716,8 @@ func IntraPodFailoverEngineContainerNames(
 	if !IsIntraPodFailoverEnabled(component) {
 		return nil
 	}
-	numShadows := component.Experimental.Failover.NumShadows
-	if numShadows == 0 {
-		numShadows = 1
-	}
-	if numShadows < 1 || numShadows > 2 {
-		return nil
-	}
-	engineCount := int(numShadows) + 1
-	names := make([]string, 0, engineCount)
-	for i := 0; i < engineCount; i++ {
+	names := make([]string, 0, failoverEngineCount)
+	for i := 0; i < failoverEngineCount; i++ {
 		names = append(names, fmt.Sprintf("engine-%d", i))
 	}
 	return names
@@ -744,20 +733,16 @@ func buildFailoverPod(
 	podSpec *corev1.PodSpec,
 	numberOfNodes int32,
 	backendFramework BackendFramework,
-	engineCount int,
 ) error {
 	if len(podSpec.Containers) == 0 {
 		return fmt.Errorf("pod spec must have at least one container for failover transformation")
-	}
-	if engineCount < failoverEngineCount || engineCount > failoverEngineCount+1 {
-		return fmt.Errorf("intra-pod failover supports one or two shadows")
 	}
 
 	mainContainer := podSpec.Containers[0]
 	sidecars := podSpec.Containers[1:]
 
-	engines := make([]corev1.Container, engineCount)
-	for i := range engineCount {
+	engines := make([]corev1.Container, failoverEngineCount)
+	for i := range failoverEngineCount {
 		engines[i] = buildEngineContainer(mainContainer, i, commonconsts.DynamoSystemPort+i)
 	}
 
@@ -767,9 +752,7 @@ func buildFailoverPod(
 	// Backend-specific overrides
 	switch backendFramework {
 	case BackendFrameworkVLLM:
-		if err := applyVLLMOverrides(updated, numberOfNodes); err != nil {
-			return err
-		}
+		applyVLLMOverrides(updated, numberOfNodes)
 	default:
 		return fmt.Errorf("failover is currently supported only for vLLM (detected: %s)", backendFramework)
 	}

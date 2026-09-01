@@ -23,7 +23,6 @@ import (
 	nvidiacomv1alpha1 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1alpha1"
 	"github.com/ai-dynamo/dynamo/deploy/operator/internal/consts"
 	"github.com/ai-dynamo/dynamo/deploy/operator/internal/features"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -34,29 +33,17 @@ const (
 	dynamoCheckpointWebhookPath = "/validate-nvidia-com-v1alpha1-dynamocheckpoint"
 )
 
-type DynamoCheckpointHandler struct {
-	operatorPrincipal string
-}
+type DynamoCheckpointHandler struct{}
 
-func NewDynamoCheckpointHandler(operatorPrincipal string) *DynamoCheckpointHandler {
-	return &DynamoCheckpointHandler{
-		operatorPrincipal: operatorPrincipal,
-	}
-}
-
-func (h *DynamoCheckpointHandler) requestUserInfo(ctx context.Context) *authenticationv1.UserInfo {
-	request, err := admission.RequestFromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	return &request.UserInfo
+func NewDynamoCheckpointHandler() *DynamoCheckpointHandler {
+	return &DynamoCheckpointHandler{}
 }
 
 func (h *DynamoCheckpointHandler) ValidateCreate(ctx context.Context, ckpt *nvidiacomv1alpha1.DynamoCheckpoint) (admission.Warnings, error) {
 	logger := log.FromContext(ctx).WithName(DynamoCheckpointWebhookName)
 	logger.Info("validate create", "name", ckpt.Name, "namespace", ckpt.Namespace)
 	validator := NewDynamoCheckpointValidator()
-	return validator.Validate(ctx, ckpt, h.requestUserInfo(ctx), h.operatorPrincipal)
+	return validator.Validate(ctx, ckpt)
 }
 
 func (h *DynamoCheckpointHandler) ValidateUpdate(ctx context.Context, oldCheckpoint, ckpt *nvidiacomv1alpha1.DynamoCheckpoint) (admission.Warnings, error) {
@@ -66,7 +53,7 @@ func (h *DynamoCheckpointHandler) ValidateUpdate(ctx context.Context, oldCheckpo
 		return nil, nil
 	}
 	validator := NewDynamoCheckpointValidator()
-	return validator.ValidateUpdate(ctx, oldCheckpoint, ckpt, h.requestUserInfo(ctx), h.operatorPrincipal)
+	return validator.ValidateUpdate(ctx, oldCheckpoint, ckpt)
 }
 
 func (h *DynamoCheckpointHandler) ValidateDelete(ctx context.Context, ckpt *nvidiacomv1alpha1.DynamoCheckpoint) (admission.Warnings, error) {

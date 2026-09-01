@@ -23,7 +23,6 @@ import (
 	nvidiacomv1alpha1 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1alpha1"
 	nvidiacomv1beta1 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1beta1"
 	"github.com/ai-dynamo/dynamo/deploy/operator/internal/consts"
-	"github.com/ai-dynamo/dynamo/deploy/operator/internal/dynamo"
 	"github.com/ai-dynamo/dynamo/deploy/operator/internal/features"
 	internalwebhook "github.com/ai-dynamo/dynamo/deploy/operator/internal/webhook"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,9 +41,7 @@ const (
 
 // DynamoComponentDeploymentHandler is a handler for validating DynamoComponentDeployment resources.
 // It is a thin wrapper around DynamoComponentDeploymentValidator.
-type DynamoComponentDeploymentHandler struct {
-	operatorPrincipal string
-}
+type DynamoComponentDeploymentHandler struct{}
 
 // dynamoComponentDeploymentV1Alpha1Handler keeps the previous endpoint available
 // during the v1alpha1-to-v1beta1 admission migration. It converts the spoke
@@ -54,21 +51,8 @@ type dynamoComponentDeploymentV1Alpha1Handler struct {
 }
 
 // NewDynamoComponentDeploymentHandler creates a new handler for DynamoComponentDeployment Webhook.
-func NewDynamoComponentDeploymentHandler(operatorPrincipal string) *DynamoComponentDeploymentHandler {
-	return &DynamoComponentDeploymentHandler{
-		operatorPrincipal: operatorPrincipal,
-	}
-}
-
-func (h *DynamoComponentDeploymentHandler) operatorGenerated(
-	ctx context.Context,
-	dcd *nvidiacomv1beta1.DynamoComponentDeployment,
-) bool {
-	if h.operatorPrincipal == "" || !dynamo.IsDGDControlled(dcd) {
-		return false
-	}
-	request, err := admission.RequestFromContext(ctx)
-	return err == nil && request.UserInfo.Username == h.operatorPrincipal
+func NewDynamoComponentDeploymentHandler() *DynamoComponentDeploymentHandler {
+	return &DynamoComponentDeploymentHandler{}
 }
 
 // ValidateCreate validates a DynamoComponentDeployment create request.
@@ -95,12 +79,7 @@ func (h *DynamoComponentDeploymentHandler) validateCreate(
 	logger.Info("validate create", "name", deployment.Name, "namespace", deployment.Namespace)
 
 	validator := NewDynamoComponentDeploymentValidator()
-	return validator.validateOperatorGenerated(
-		ctx,
-		deployment,
-		runtimeVersionValidationSourceForRequest(ctx, expectedGVK),
-		h.operatorGenerated(ctx, deployment),
-	)
+	return validator.validate(ctx, deployment, runtimeVersionValidationSourceForRequest(ctx, expectedGVK))
 }
 
 // ValidateUpdate validates a DynamoComponentDeployment update request.
@@ -141,13 +120,7 @@ func (h *DynamoComponentDeploymentHandler) validateUpdate(
 	}
 
 	validator := NewDynamoComponentDeploymentValidator()
-	return validator.validateUpdateOperatorGenerated(
-		ctx,
-		oldDeployment,
-		newDeployment,
-		runtimeVersionValidationSourceForRequest(ctx, expectedGVK),
-		h.operatorGenerated(ctx, newDeployment),
-	)
+	return validator.ValidateUpdate(ctx, oldDeployment, newDeployment, runtimeVersionValidationSourceForRequest(ctx, expectedGVK))
 }
 
 // ValidateDelete validates a DynamoComponentDeployment delete request.

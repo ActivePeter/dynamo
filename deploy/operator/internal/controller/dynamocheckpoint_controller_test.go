@@ -100,11 +100,10 @@ func makeCheckpointReconciler(s *runtime.Scheme, objs ...client.Object) *Checkpo
 func makeTestCheckpoint(phase nvidiacomv1alpha1.DynamoCheckpointPhase) *nvidiacomv1alpha1.DynamoCheckpoint {
 	runAsUser := int64(1234)
 	fsGroup := int64(4321)
-	identity := checkpointTestIdentity
 	return &nvidiacomv1alpha1.DynamoCheckpoint{
 		ObjectMeta: metav1.ObjectMeta{Name: testHash, Namespace: testNamespace},
 		Spec: nvidiacomv1alpha1.DynamoCheckpointSpec{
-			Identity: &identity,
+			Identity: checkpointTestIdentity,
 			Job: nvidiacomv1alpha1.DynamoCheckpointJobConfig{
 				TargetContainerName: "main",
 				PodTemplateSpec: corev1.PodTemplateSpec{

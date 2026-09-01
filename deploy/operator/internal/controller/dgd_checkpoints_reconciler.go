@@ -312,7 +312,15 @@ func (r *dgdCheckpointsReconciler) createCheckpointCR(
 		r.Client,
 		dynamoDeployment.Namespace,
 		checkpointID,
-		nil,
+		nvidiacomv1alpha1.DynamoCheckpointIdentity{
+			Model:            fmt.Sprintf("%s/%s", dynamoDeployment.Namespace, dynamoDeployment.Name),
+			BackendFramework: string(backendFramework),
+			ExtraParameters: map[string]string{
+				"dgdUID":       string(dynamoDeployment.UID),
+				"component":    componentName,
+				"checkpointID": checkpointID,
+			},
+		},
 		podTemplate,
 		targetContainerName,
 		deletionPolicy,
@@ -455,10 +463,6 @@ func (r *dgdCheckpointsReconciler) deleteAutoCheckpointsForDGD(
 	ctx context.Context,
 	dgd *nvidiacomv1beta1.DynamoGraphDeployment,
 ) error {
-	dgdController := metav1.NewControllerRef(
-		dgd,
-		nvidiacomv1beta1.GroupVersion.WithKind("DynamoGraphDeployment"),
-	)
 	checkpoints := &nvidiacomv1alpha1.DynamoCheckpointList{}
 	if err := r.List(
 		ctx,
@@ -470,7 +474,7 @@ func (r *dgdCheckpointsReconciler) deleteAutoCheckpointsForDGD(
 	}
 	for i := range checkpoints.Items {
 		ckpt := &checkpoints.Items[i]
-		if !checkpoint.IsAutomaticCheckpointControlledBy(ckpt, dgdController) {
+		if ckpt.Annotations == nil || ckpt.Annotations[consts.CheckpointAutoAnnotation] != consts.KubeLabelValueTrue {
 			continue
 		}
 		if ckpt.Annotations[consts.CheckpointDeletionPolicyAnnotation] == string(nvidiacomv1alpha1.CheckpointDeletionPolicyRetain) {
@@ -491,16 +495,7 @@ func (r *dgdCheckpointsReconciler) detachRetainedAutoCheckpoint(
 	ckpt *nvidiacomv1alpha1.DynamoCheckpoint,
 ) error {
 	updated := ckpt.DeepCopy()
-	for i := range updated.OwnerReferences {
-		ref := updated.OwnerReferences[i]
-		if ref.Controller != nil && *ref.Controller {
-			updated.OwnerReferences = append(
-				updated.OwnerReferences[:i],
-				updated.OwnerReferences[i+1:]...,
-			)
-			break
-		}
-	}
+	updated.OwnerReferences = nil
 	if updated.Labels != nil {
 		delete(updated.Labels, consts.KubeLabelDynamoGraphDeploymentName)
 	}

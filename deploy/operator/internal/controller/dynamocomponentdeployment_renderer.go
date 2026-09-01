@@ -25,7 +25,6 @@ import (
 
 	"emperror.dev/errors"
 	configv1alpha1 "github.com/ai-dynamo/dynamo/deploy/operator/api/config/v1alpha1"
-	nvidiacomv1alpha1 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1alpha1"
 	nvidiacomv1beta1 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1beta1"
 	"github.com/ai-dynamo/dynamo/deploy/operator/internal/checkpoint"
 	commonconsts "github.com/ai-dynamo/dynamo/deploy/operator/internal/consts"
@@ -210,8 +209,10 @@ func (r *dcdWorkloadRenderer) generatePodTemplateSpec(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to resolve checkpoint")
 		}
-		if err := r.configureIntraPodFailoverCheckpoint(ctx, dcd, info); err != nil {
-			return nil, err
+		if dynamo.IsIntraPodFailoverEnabled(&dcd.Spec.DynamoComponentDeploymentSharedSpec) {
+			info.RestoreTargetContainers = dynamo.IntraPodFailoverEngineContainerNames(
+				&dcd.Spec.DynamoComponentDeploymentSharedSpec,
+			)
 		}
 		if err := gms.OverlayClients(
 			&info.GPUMemoryService,
@@ -306,32 +307,6 @@ func (r *dcdWorkloadRenderer) generatePodTemplateSpec(
 	}, nil
 }
 
-func (r *dcdWorkloadRenderer) configureIntraPodFailoverCheckpoint(
-	ctx context.Context,
-	dcd *nvidiacomv1beta1.DynamoComponentDeployment,
-	info *checkpoint.CheckpointInfo,
-) error {
-	if !dynamo.IsIntraPodFailoverEnabled(&dcd.Spec.DynamoComponentDeploymentSharedSpec) {
-		return nil
-	}
-
-	referenced := &nvidiacomv1alpha1.DynamoCheckpoint{}
-	if err := r.reader.Get(ctx, types.NamespacedName{
-		Namespace: dcd.Namespace,
-		Name:      info.CheckpointName,
-	}, referenced); err != nil {
-		return errors.Wrap(err, "failed to get automatic failover checkpoint")
-	}
-	if !checkpoint.IsAutomaticCheckpointControlledBy(referenced, metav1.GetControllerOf(dcd)) {
-		return errors.New(
-			"automatic failover checkpoint must be operator-managed and controlled by the same DynamoGraphDeployment",
-		)
-	}
-	info.RestoreTargetContainers = dynamo.IntraPodFailoverEngineContainerNames(
-		&dcd.Spec.DynamoComponentDeploymentSharedSpec,
-	)
-	return nil
-}
 
 func (r *dcdWorkloadRenderer) generateService(
 	ctx context.Context,

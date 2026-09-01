@@ -52,7 +52,7 @@ func Setup(mgr ctrl.Manager, opts Options) error {
 		internalwebhook.SetExcludedNamespaces(nil)
 	}
 
-	dcdHandler := webhookvalidation.NewDynamoComponentDeploymentHandler(opts.OperatorPrincipal)
+	dcdHandler := webhookvalidation.NewDynamoComponentDeploymentHandler()
 	if err := dcdHandler.RegisterWithManager(mgr, gate); err != nil {
 		return fmt.Errorf("unable to register DynamoComponentDeployment webhook: %w", err)
 	}
@@ -62,7 +62,7 @@ func Setup(mgr ctrl.Manager, opts Options) error {
 		return fmt.Errorf("unable to register DynamoGraphDeployment webhook: %w", err)
 	}
 
-	dckptHandler := webhookvalidation.NewDynamoCheckpointHandler(opts.OperatorPrincipal)
+	dckptHandler := webhookvalidation.NewDynamoCheckpointHandler()
 	if err := dckptHandler.RegisterWithManager(mgr, gate); err != nil {
 		return fmt.Errorf("unable to register DynamoCheckpoint webhook: %w", err)
 	}

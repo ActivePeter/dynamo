@@ -39,7 +39,6 @@ func NewDynamoComponentDeploymentValidator() *DynamoComponentDeploymentValidator
 // API values and derived traversal state remain explicit validator arguments.
 type dynamoComponentDeploymentValidation struct {
 	sharedValidation
-	operatorGenerated bool
 }
 
 // Validate performs stateless validation on the v1beta1 DynamoComponentDeployment.
@@ -56,14 +55,13 @@ func (v *DynamoComponentDeploymentValidator) validate(
 	dcd *nvidiacomv1beta1.DynamoComponentDeployment,
 	runtimeVersionSource runtimeVersionValidationSource,
 ) (admission.Warnings, error) {
-	return v.validateOperatorGenerated(ctx, dcd, runtimeVersionSource, false)
+	return v.validateInternal(ctx, dcd, runtimeVersionSource)
 }
 
-func (v *DynamoComponentDeploymentValidator) validateOperatorGenerated(
+func (v *DynamoComponentDeploymentValidator) validateInternal(
 	ctx context.Context,
 	dcd *nvidiacomv1beta1.DynamoComponentDeployment,
 	runtimeVersionSource runtimeVersionValidationSource,
-	operatorGenerated bool,
 ) (admission.Warnings, error) {
 	validation := &dynamoComponentDeploymentValidation{
 		sharedValidation: sharedValidation{
@@ -71,7 +69,6 @@ func (v *DynamoComponentDeploymentValidator) validateOperatorGenerated(
 			runtimeVersionSource:               runtimeVersionSource,
 			allowMissingRuntimeVersionOverride: true,
 		},
-		operatorGenerated: operatorGenerated,
 	}
 
 	allErrs := validation.validateDynamoComponentDeployment(dcd)
@@ -93,15 +90,14 @@ func (v *DynamoComponentDeploymentValidator) ValidateUpdate(
 	newDCD *nvidiacomv1beta1.DynamoComponentDeployment,
 	runtimeVersionSource runtimeVersionValidationSource,
 ) (admission.Warnings, error) {
-	return v.validateUpdateOperatorGenerated(ctx, oldDCD, newDCD, runtimeVersionSource, false)
+	return v.validateUpdateInternal(ctx, oldDCD, newDCD, runtimeVersionSource)
 }
 
-func (v *DynamoComponentDeploymentValidator) validateUpdateOperatorGenerated(
+func (v *DynamoComponentDeploymentValidator) validateUpdateInternal(
 	ctx context.Context,
 	oldDCD *nvidiacomv1beta1.DynamoComponentDeployment,
 	newDCD *nvidiacomv1beta1.DynamoComponentDeployment,
 	runtimeVersionSource runtimeVersionValidationSource,
-	operatorGenerated bool,
 ) (admission.Warnings, error) {
 	validation := &dynamoComponentDeploymentValidation{
 		sharedValidation: sharedValidation{
@@ -110,7 +106,6 @@ func (v *DynamoComponentDeploymentValidator) validateUpdateOperatorGenerated(
 			ratchetRuntimeVersion:              true,
 			allowMissingRuntimeVersionOverride: true,
 		},
-		operatorGenerated: operatorGenerated,
 	}
 
 	allErrs := validation.validateDynamoComponentDeployment(newDCD)
@@ -146,7 +141,7 @@ func (v *dynamoComponentDeploymentValidation) validateDynamoComponentDeployment(
 	for _, err := range dynamo.ValidateAutomaticFailoverCheckpointTarget(
 		&dcd.Spec.DynamoComponentDeploymentSharedSpec,
 		dcd.Spec.BackendFramework,
-		v.operatorGenerated,
+		dynamo.IsDGDControlled(dcd),
 	) {
 		allErrs = append(allErrs, field.Forbidden(
 			fldPath.Child("experimental", "checkpoint"),
