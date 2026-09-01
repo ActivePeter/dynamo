@@ -189,13 +189,12 @@ func (v *sharedValidation) validateFailoverSpecV1alpha1(
 	fldPath *field.Path,
 ) field.ErrorList {
 	if !failover.Enabled || failover.Mode != nvidiacomv1alpha1.GMSModeIntraPod ||
-		failover.NumShadows == 0 ||
-		(failover.NumShadows >= 1 && failover.NumShadows <= 2) {
+		failover.NumShadows == 0 || failover.NumShadows == 1 {
 		return nil
 	}
 	return field.ErrorList{field.Invalid(
 		fldPath.Child("numShadows"),
 		failover.NumShadows,
-		fmt.Sprintf("is invalid for mode=%q: supported values are 1 and 2", nvidiacomv1alpha1.GMSModeIntraPod),
+		fmt.Sprintf("is invalid for mode=%q: intraPod uses a fixed 1 primary + 1 shadow sidecar; use failover.mode=%q to configure numShadows", nvidiacomv1alpha1.GMSModeIntraPod, nvidiacomv1alpha1.GMSModeInterPod),
 	)}
 }
