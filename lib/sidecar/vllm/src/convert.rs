@@ -723,7 +723,6 @@ fn build_preprocessed_media(
         client::invalid_argument("preprocessed multimodal prompt length exceeds platform limits")
     })?;
     let mut decoded_bytes = 0usize;
-    let mut ranges = Vec::with_capacity(feature_count);
     let mut media = Vec::with_capacity(feature_count);
 
     for (modality, hashes) in mm_hashes {
@@ -786,7 +785,6 @@ fn build_preprocessed_media(
 
             let decoded_kwargs =
                 decode_preprocessed_kwargs(encoded_kwargs, &mut decoded_bytes, &modality, index)?;
-            ranges.push((placeholder.offset, end));
             media.push(pb::MediaItem {
                 modality: modality_code as i32,
                 source: Some(pb::media_item::Source::Features(
@@ -805,12 +803,6 @@ fn build_preprocessed_media(
         }
     }
 
-    ranges.sort_unstable_by_key(|range| range.0);
-    if ranges.windows(2).any(|pair| pair[0].1 > pair[1].0) {
-        return Err(client::invalid_argument(
-            "preprocessed multimodal placeholder ranges cannot overlap",
-        ));
-    }
     Ok(media)
 }
 
