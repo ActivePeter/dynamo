@@ -2064,6 +2064,8 @@ fn preprocessed_multimodal_features_allow_overlapping_audio_video_spans() {
     .expect("overlapping audio and video features are valid");
 
     assert_eq!(wire.media.len(), 2);
+    assert_eq!(wire.media[0].modality, pb::Modality::Video as i32);
+    assert_eq!(wire.media[1].modality, pb::Modality::Audio as i32);
     assert!(wire.media.iter().all(|item| {
         matches!(
             item.source.as_ref(),

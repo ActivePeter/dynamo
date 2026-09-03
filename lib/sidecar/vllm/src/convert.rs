@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use dynamo_backend_common::{
     DisaggregationMode, DynamoError, GuidedDecodingOptions, LLMEngineOutput, MultimodalData,
@@ -27,9 +25,9 @@ const MAX_PREPROCESSED_MM_HASH_BYTES: usize = 256;
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct VllmTitoFeatures {
-    mm_hashes: BTreeMap<String, Vec<String>>,
-    mm_placeholders: BTreeMap<String, Vec<VllmTitoPlaceholder>>,
-    kwargs_data: BTreeMap<String, Vec<String>>,
+    mm_hashes: indexmap::IndexMap<String, Vec<String>>,
+    mm_placeholders: indexmap::IndexMap<String, Vec<VllmTitoPlaceholder>>,
+    kwargs_data: indexmap::IndexMap<String, Vec<String>>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -690,11 +688,16 @@ fn build_preprocessed_media(
             "extra_args.vllm_tito.features.mm_hashes must contain at least one modality",
         ));
     }
-    if !features
-        .mm_hashes
-        .keys()
-        .eq(features.mm_placeholders.keys())
-        || !features.mm_hashes.keys().eq(features.kwargs_data.keys())
+    if features.mm_hashes.len() != features.mm_placeholders.len()
+        || features.mm_hashes.len() != features.kwargs_data.len()
+        || !features
+            .mm_hashes
+            .keys()
+            .all(|modality| features.mm_placeholders.contains_key(modality))
+        || !features
+            .mm_hashes
+            .keys()
+            .all(|modality| features.kwargs_data.contains_key(modality))
     {
         return Err(client::invalid_argument(
             "extra_args.vllm_tito.features hashes, placeholders, and kwargs_data must contain the same modalities",
