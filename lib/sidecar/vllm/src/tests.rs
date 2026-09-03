@@ -1931,18 +1931,34 @@ async fn decode_cancellation_maps_premature_eof_to_cancelled() {
     assert_eq!(terminal.finish_reason, Some(FinishReason::Cancelled));
 }
 
-#[test]
-fn preprocessed_multimodal_features_are_forwarded_to_vllm_grpc() {
+const VALID_MM_KWARGS_BASE64: &str =
+    "gaxwaXhlbF92YWx1ZXOCpGRhdGGTpXVpbnQ4kQPHAwMBAgOlZmllbGSSp2JhdGNoZWSBq2tlZXBfb25fY3B1wg==";
+
+fn request_with_preprocessed_features(features: serde_json::Value) -> PreprocessedRequest {
     let mut request = request();
     request.extra_args = Some(json!({
         "vllm_tito": {
-            "features": {
-                "mm_hashes": {"image": ["image-hash-a"]},
-                "mm_placeholders": {"image": [{"offset": 1, "length": 2}]},
-                "kwargs_data": {"image": ["gaxwaXhlbF92YWx1ZXOCpGRhdGGTpXVpbnQ4kQPHAwMBAgOlZmllbGSSp2JhdGNoZWSBq2tlZXBfb25fY3B1wg=="]}
-            }
+            "request_id": "request-1",
+            "sampling_params": {},
+            "stream": false,
+            "priority": 0,
+            "features": features
         }
     }));
+    request
+}
+
+fn image_features(kwargs: serde_json::Value) -> serde_json::Value {
+    json!({
+        "mm_hashes": {"image": ["image-hash-a"]},
+        "mm_placeholders": {"image": [{"offset": 1, "length": 2}]},
+        "kwargs_data": {"image": [kwargs]}
+    })
+}
+
+#[test]
+fn preprocessed_multimodal_features_are_forwarded_to_vllm_grpc() {
+    let request = request_with_preprocessed_features(image_features(json!(VALID_MM_KWARGS_BASE64)));
 
     let wire = build_generate_request(
         request,
@@ -1959,6 +1975,94 @@ fn preprocessed_multimodal_features_are_forwarded_to_vllm_grpc() {
     assert_eq!(feature.mm_hash.as_deref(), Some("image-hash-a"));
     assert_eq!((feature.offset, feature.length), (1, 2));
     assert_eq!(feature.kwargs.as_ref().map(Vec::len), Some(64));
+}
+
+#[test]
+fn preprocessed_multimodal_features_require_inline_kwargs() {
+    for kwargs in [
+        serde_json::Value::Null,
+        serde_json::Value::String(String::new()),
+    ] {
+        let error = build_generate_request(
+            request_with_preprocessed_features(image_features(kwargs)),
+            "request-1".to_string(),
+            DisaggregationMode::Aggregated,
+        )
+        .expect_err("empty feature kwargs must be rejected");
+        assert!(error.to_string().contains("features"));
+    }
+}
+
+#[test]
+fn preprocessed_multimodal_features_enforce_hash_and_count_limits() {
+    let mut oversized_hash = image_features(json!(VALID_MM_KWARGS_BASE64));
+    oversized_hash["mm_hashes"]["image"][0] = json!("h".repeat(257));
+    let hash_error = build_generate_request(
+        request_with_preprocessed_features(oversized_hash),
+        "request-1".to_string(),
+        DisaggregationMode::Aggregated,
+    )
+    .expect_err("producer hashes must be bounded");
+    assert!(hash_error.to_string().contains("between 1 and 256 bytes"));
+
+    let too_many = json!({
+        "mm_hashes": {"image": vec!["image-hash"; 65]},
+        "mm_placeholders": {"image": (0..65).map(|offset| json!({"offset": offset, "length": 1})).collect::<Vec<_>>()},
+        "kwargs_data": {"image": vec![VALID_MM_KWARGS_BASE64; 65]}
+    });
+    let count_error = build_generate_request(
+        request_with_preprocessed_features(too_many),
+        "request-1".to_string(),
+        DisaggregationMode::Aggregated,
+    )
+    .expect_err("feature count must be bounded");
+    assert!(count_error.to_string().contains("at most 64"));
+}
+
+#[test]
+fn preprocessed_multimodal_features_cannot_mix_with_raw_media() {
+    let mut request =
+        request_with_preprocessed_features(image_features(json!(VALID_MM_KWARGS_BASE64)));
+    request.multi_modal_data = Some(std::collections::HashMap::from([(
+        "image_url".to_string(),
+        vec![MultimodalData::RawUrl(
+            "data:image/png;base64,iVBORw0KGgo=".to_string(),
+        )],
+    )]));
+
+    let error = build_generate_request(
+        request,
+        "request-1".to_string(),
+        DisaggregationMode::Aggregated,
+    )
+    .expect_err("raw media and preprocessed features must not be mixed");
+    assert!(error.to_string().contains("cannot be mixed"));
+}
+
+#[tokio::test]
+async fn preprocessed_multimodal_features_require_model_support() {
+    let engine = engine(
+        "http://127.0.0.1:9",
+        DisaggregationMode::Aggregated,
+        1,
+        model_info(),
+    );
+    let context = dynamo_backend_common::testing::mock_context();
+    let result = engine
+        .generate(
+            request_with_preprocessed_features(image_features(json!(VALID_MM_KWARGS_BASE64))),
+            GenerateContext::new(context, None),
+        )
+        .await;
+    let error = match result {
+        Ok(_) => panic!("a text-only model must reject preprocessed media before RPC submission"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("does not advertise multimodal support")
+    );
 }
 
 #[tokio::test]
