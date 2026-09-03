@@ -1931,6 +1931,36 @@ async fn decode_cancellation_maps_premature_eof_to_cancelled() {
     assert_eq!(terminal.finish_reason, Some(FinishReason::Cancelled));
 }
 
+#[test]
+fn preprocessed_multimodal_features_are_forwarded_to_vllm_grpc() {
+    let mut request = request();
+    request.extra_args = Some(json!({
+        "vllm_tito": {
+            "features": {
+                "mm_hashes": {"image": ["image-hash-a"]},
+                "mm_placeholders": {"image": [{"offset": 1, "length": 2}]},
+                "kwargs_data": {"image": ["gaxwaXhlbF92YWx1ZXOCpGRhdGGTpXVpbnQ4kQPHAwMBAgOlZmllbGSSp2JhdGNoZWSBq2tlZXBfb25fY3B1wg=="]}
+            }
+        }
+    }));
+
+    let wire = build_generate_request(
+        request,
+        "request-1".to_string(),
+        DisaggregationMode::Aggregated,
+    )
+    .expect("preprocessed features should be forwarded");
+
+    let feature = match wire.media[0].source.as_ref() {
+        Some(pb::media_item::Source::Features(feature)) => feature,
+        other => panic!("expected preprocessed features, got {other:?}"),
+    };
+    assert_eq!(feature.identifier, "image-hash-a");
+    assert_eq!(feature.mm_hash.as_deref(), Some("image-hash-a"));
+    assert_eq!((feature.offset, feature.length), (1, 2));
+    assert_eq!(feature.kwargs.as_ref().map(Vec::len), Some(64));
+}
+
 #[tokio::test]
 async fn unsupported_features_fail_before_rpc_submission() {
     let server = FakeServer::start(FakeVllm::default()).await;
