@@ -2039,6 +2039,40 @@ fn preprocessed_multimodal_features_cannot_mix_with_raw_media() {
     assert!(error.to_string().contains("cannot be mixed"));
 }
 
+#[test]
+fn preprocessed_multimodal_features_allow_overlapping_audio_video_spans() {
+    let features = json!({
+        "mm_hashes": {
+            "video": ["video-hash-a"],
+            "audio": ["audio-hash-a"]
+        },
+        "mm_placeholders": {
+            "video": [{"offset": 1, "length": 2}],
+            "audio": [{"offset": 1, "length": 2}]
+        },
+        "kwargs_data": {
+            "video": [VALID_MM_KWARGS_BASE64],
+            "audio": [VALID_MM_KWARGS_BASE64]
+        }
+    });
+
+    let wire = build_generate_request(
+        request_with_preprocessed_features(features),
+        "request-1".to_string(),
+        DisaggregationMode::Aggregated,
+    )
+    .expect("overlapping audio and video features are valid");
+
+    assert_eq!(wire.media.len(), 2);
+    assert!(wire.media.iter().all(|item| {
+        matches!(
+            item.source.as_ref(),
+            Some(pb::media_item::Source::Features(feature))
+                if (feature.offset, feature.length) == (1, 2)
+        )
+    }));
+}
+
 #[tokio::test]
 async fn preprocessed_multimodal_features_require_model_support() {
     let engine = engine(
