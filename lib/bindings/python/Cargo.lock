@@ -2620,6 +2620,7 @@ dependencies = [
  "dynamo-backend-common",
  "dynamo-sidecar-common",
  "futures",
+ "indexmap 2.14.0",
  "prost 0.13.5",
  "prost-types 0.13.5",
  "reqwest 0.12.28",
